@@ -47,6 +47,7 @@ func MakeRequest(method string, path string) ([]byte, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	req, err := http.NewRequest(method, os.Getenv("BASEURL")+path, bytes.NewBuffer(authJson))
 	req.Header.Add("Content-Type", "application/json")
 

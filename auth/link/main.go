@@ -1,9 +1,11 @@
 package main
 
 import (
+	"auth/utils"
 	"encoding/base64"
 	"encoding/json"
 	"log"
+	"net/url"
 	"os"
 	"time"
 
@@ -11,11 +13,6 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/golang-jwt/jwt"
 )
-
-type Claims struct {
-	// foo string
-	// nbf int64
-}
 
 type Token struct {
 	Raw string // The raw token.  Populated when you Parse a token
@@ -27,6 +24,7 @@ type Token struct {
 }
 
 type AuthBody struct {
+	Email     string            `json:"email"`
 	Url       string            `json:"url"`
 	UrlParams map[string]string `json:"urlParams"`
 }
@@ -39,23 +37,52 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	var authBody AuthBody
 	json.Unmarshal([]byte(request.Body), &authBody)
 
+	var CustomerIDForToken string
+
+	customerID, statusCode, err := utils.CheckCustomerExists(authBody.Email)
+	CustomerIDForToken = customerID
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if statusCode >= 400 {
+		return utils.HandleError(err, statusCode)
+	}
+
+	if CustomerIDForToken == "" {
+		customer, statusCode, err := utils.CreateCustomer(authBody.Email)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if statusCode >= 400 {
+			return utils.HandleError(err, statusCode)
+		}
+
+		CustomerIDForToken = customer.Result.ID
+	}
+
 	// Create a new token object, specifying signing method and the claims
 	// you would like it to contain.
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"iss": "Trader Interactive",
-		"sub": "Auth Token",
-		"aud": "some-realm",
-		"exp": time.Now().Add(time.Hour * 24).Unix(),
-		"nbf": time.Now().Unix(),
-		"iat": time.Now().Unix(),
-		"url": authBody.Url,
+		"iss":        "Trader Interactive",
+		"sub":        "Auth Token",
+		"aud":        "some-realm",
+		"exp":        time.Now().Add(time.Hour * 24).Unix(),
+		"nbf":        time.Now().Unix(),
+		"iat":        time.Now().Unix(),
+		"url":        authBody.Url,
+		"email":      authBody.Email,
+		"customerID": CustomerIDForToken,
 	})
 
 	// Sign and get the complete encoded token as a string using the secret
 	rawDecodedText, err := base64.StdEncoding.DecodeString(os.Getenv("JWT_SECRET"))
 
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	tokenString, err := token.SignedString(rawDecodedText)
@@ -64,10 +91,10 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		log.Fatal(err)
 	}
 
-	tokenString = "token=" + tokenString
+	url := addQueryParams(authBody, tokenString)
 
 	var responseLink AuthResponseBody = AuthResponseBody{
-		Link: authBody.Url + "?" + tokenString,
+		Link: url.String(),
 	}
 
 	res, err := json.Marshal(responseLink)
@@ -76,10 +103,30 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		log.Fatal(err)
 	}
 
+	utils.SendEmail(authBody.Email, url.String())
+
 	return events.APIGatewayProxyResponse{
 		Body:       string(res),
 		StatusCode: 200,
 	}, nil
+}
+
+func addQueryParams(body AuthBody, token string) *url.URL {
+	url, err := url.Parse(body.Url)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	queryParams := url.Query()
+	queryParams.Add("token", token)
+
+	for key, value := range body.UrlParams {
+		queryParams.Add(key, value)
+	}
+
+	url.RawQuery = queryParams.Encode()
+
+	return url
 }
 
 func main() {
