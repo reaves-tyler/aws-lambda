@@ -81,8 +81,6 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 
 	rawDecodedText, err := base64.StdEncoding.DecodeString(os.Getenv("JWT_SECRET"))
 
-	log.Print(string(rawDecodedText))
-
 	if err != nil {
 		log.Fatal(err)
 	}
