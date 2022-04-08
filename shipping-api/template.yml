@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Globals:
+  Function:
+    Runtime: go1.x
+    MemorySize: 128
+    Timeout: 180
+Resources:
+  Token:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: token/
+      Handler: main
+      Events:
+        GetEvent:
+          Type: Api
+          Properties:
+            Path: /token
+            Method: get

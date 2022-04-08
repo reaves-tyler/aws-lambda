@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Globals:
+  Function:
+    Runtime: go1.x
+    MemorySize: 128
+    Timeout: 180
+Resources:
+  Link:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: link/
+      Handler: main
+      Events:
+        PostEvent:
+          Type: Api
+          Properties:
+            Path: /link
+            Method: post
