@@ -2,8 +2,10 @@ package main
 
 import (
 	"auth/utils"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"log"
 	"net/url"
 	"os"
@@ -66,26 +68,40 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 
 	// Create a new token object, specifying signing method and the claims
 	// you would like it to contain.
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"iss":        "Trader Interactive",
-		"sub":        "Auth Token",
-		"aud":        "some-realm",
-		"exp":        time.Now().Add(time.Hour * 24).Unix(),
-		"nbf":        time.Now().Unix(),
-		"iat":        time.Now().Unix(),
-		"url":        authBody.Url,
-		"email":      authBody.Email,
-		"customerID": CustomerIDForToken,
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"iss":   "Trader Interactive",
+		"sub":   CustomerIDForToken,
+		"aud":   "some-realm",
+		"exp":   time.Now().Add(time.Hour * 24).Unix(),
+		"nbf":   time.Now().Unix(),
+		"iat":   time.Now().Unix(),
+		"url":   authBody.Url,
+		"email": authBody.Email,
 	})
 
-	// Sign and get the complete encoded token as a string using the secret
 	rawDecodedText, err := base64.StdEncoding.DecodeString(os.Getenv("JWT_SECRET"))
+
+	log.Print(string(rawDecodedText))
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	tokenString, err := token.SignedString(rawDecodedText)
+	// https://pkg.go.dev/encoding/pem#example-Decode
+	block, rest := pem.Decode(rawDecodedText)
+	if block == nil {
+		log.Fatal("failed to decode PEM block containing private key", rest)
+	}
+
+	priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+
+	if err != nil {
+		log.Print("failed to parse RSA public Key from PEM")
+		log.Fatal(err)
+	}
+
+	// Sign and get the complete encoded token as a string using the secret
+	tokenString, err := token.SignedString(priv)
 
 	if err != nil {
 		log.Fatal(err)

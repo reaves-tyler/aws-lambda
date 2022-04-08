@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"time"
@@ -33,7 +34,17 @@ func DoRequest(req *http.Request) ([]byte, int, error) {
 }
 
 func MakeTokenRequest() ([]byte, int, error) {
-	req, err := http.NewRequest("POST", os.Getenv("NEBULOUS_URL")+"token", nil)
+	buf := new(bytes.Buffer)
+	writer := multipart.NewWriter(buf)
+	writer.WriteField("grant_type", "client_credentials")
+	writer.WriteField("client_id", os.Getenv("NEBULOUS_CLIENT_ID"))
+	writer.WriteField("client_secret", os.Getenv("NEBULOUS_CLIENT_SECRET"))
+	err := writer.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+	req, err := http.NewRequest("POST", os.Getenv("NEBULOUS_BASEURL")+"token", buf)
+	req.Header.Add("Content-Type", writer.FormDataContentType())
 
 	if err != nil {
 		log.Fatal(err)
