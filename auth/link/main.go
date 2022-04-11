@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"time"
@@ -29,6 +31,7 @@ type AuthBody struct {
 	Email     string            `json:"email"`
 	Url       string            `json:"url"`
 	UrlParams map[string]string `json:"urlParams"`
+	Realm     string            `json:"realm"`
 }
 
 type AuthResponseBody struct {
@@ -38,6 +41,12 @@ type AuthResponseBody struct {
 func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	var authBody AuthBody
 	json.Unmarshal([]byte(request.Body), &authBody)
+
+	err := validateRequestBody(&authBody)
+
+	if err != nil {
+		return utils.HandleError(err, http.StatusBadRequest)
+	}
 
 	var CustomerIDForToken string
 
@@ -71,7 +80,7 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
 		"iss":   "Trader Interactive",
 		"sub":   CustomerIDForToken,
-		"aud":   "some-realm",
+		"aud":   authBody.Realm,
 		"exp":   time.Now().Add(time.Hour * 24).Unix(),
 		"nbf":   time.Now().Unix(),
 		"iat":   time.Now().Unix(),
@@ -105,7 +114,7 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		log.Fatal(err)
 	}
 
-	url := addQueryParams(authBody, tokenString)
+	url := addQueryParams(&authBody, &tokenString)
 
 	var responseLink AuthResponseBody = AuthResponseBody{
 		Link: url.String(),
@@ -117,7 +126,7 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		log.Fatal(err)
 	}
 
-	utils.SendEmail(authBody.Email, url.String())
+	utils.SendEmail(authBody.Email, url.String(), authBody.Realm)
 
 	return events.APIGatewayProxyResponse{
 		Body:       string(res),
@@ -125,22 +134,38 @@ func Handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	}, nil
 }
 
-func addQueryParams(body AuthBody, token string) *url.URL {
+func addQueryParams(body *AuthBody, token *string) *url.URL {
 	url, err := url.Parse(body.Url)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	queryParams := url.Query()
-	queryParams.Add("token", token)
+	queryParams.Add("token", *token)
 
-	for key, value := range body.UrlParams {
+	for key, value := range (*body).UrlParams {
 		queryParams.Add(key, value)
 	}
 
 	url.RawQuery = queryParams.Encode()
 
 	return url
+}
+
+func validateRequestBody(body *AuthBody) error {
+	if body.Email == "" {
+		return errors.New("email is required")
+	}
+
+	if body.Url == "" {
+		return errors.New("url is required")
+	}
+
+	if body.Realm == "" {
+		return errors.New("realm is required")
+	}
+
+	return nil
 }
 
 func main() {

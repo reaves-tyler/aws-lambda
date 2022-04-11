@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 )
 
@@ -106,7 +107,7 @@ func CreateCustomer(email string) (NewCustomer, int, error) {
 	postData, err := json.Marshal(customer)
 
 	if err != nil {
-		return NewCustomer{}, 500, err
+		return NewCustomer{}, http.StatusInternalServerError, err
 	}
 
 	body, statusCode, err := MakeRequest("POST", os.Getenv("NEBULOUS_URL")+"customers/", postData, token)

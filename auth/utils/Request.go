@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"log"
 	"mime/multipart"
@@ -80,8 +81,19 @@ func MakeRequest(method string, endpoint string, body []byte, token string) ([]b
 }
 
 func HandleError(err error, statusCode int) (events.APIGatewayProxyResponse, error) {
+	type ErrorResponse struct {
+		Error string `json:"error"`
+	}
+
+	errorResponse := ErrorResponse{Error: err.Error()}
+	msg, err := json.Marshal(errorResponse)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	return events.APIGatewayProxyResponse{
-		Body:       err.Error(),
+		Body:       string(msg),
 		StatusCode: statusCode,
 	}, nil
 }

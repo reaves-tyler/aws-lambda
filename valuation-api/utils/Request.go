@@ -32,7 +32,7 @@ func DoRequest(req *http.Request) ([]byte, int, error) {
 }
 
 func MakeRequest(method string, path string) ([]byte, int, error) {
-	req, err := http.NewRequest(method, os.Getenv("VALUATION_BASEURL")+path, nil)
+	req, err := http.NewRequest(method, os.Getenv("BASEURL")+path, nil)
 
 	if err != nil {
 		log.Fatal(err)
@@ -51,8 +51,8 @@ func MakeRequest(method string, path string) ([]byte, int, error) {
 }
 
 func AppendJDPowerAuth(req *http.Request) *http.Request {
-	req.Header.Add("UserName", os.Getenv("VALUATION_USERNAME"))
-	req.Header.Add("Password", os.Getenv("VALUATION_PASSWORD"))
+	req.Header.Add("UserName", os.Getenv("USERNAME"))
+	req.Header.Add("Password", os.Getenv("PASSWORD"))
 
 	return req
 }

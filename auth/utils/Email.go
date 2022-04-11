@@ -21,9 +21,6 @@ const (
 	// set, comment the next line and line 92.
 	//ConfigurationSet = "ConfigSet"
 
-	// The subject line for the email.
-	Subject = "Amazon SES Test (AWS SDK for Go)"
-
 	//The email body for recipients with non-HTML email clients.
 	TextBody = "This email was sent with Amazon SES using the AWS SDK for Go."
 
@@ -31,14 +28,16 @@ const (
 	CharSet = "UTF-8"
 )
 
-func SendEmail(recipient string, link string) {
-	if recipient == "" || link == "" {
+func SendEmail(recipient string, link string, realm string) {
+	if recipient == "" || link == "" || realm == "" {
 		return
 	}
 
-	// The HTML body for the email.
-	HtmlBody := "<h1>Amazon SES Test Email (AWS SDK for Go)</h1><p>Login with this link: " +
-		"<a href='" + link + "'>MAGIC LINK</a></p>"
+	// The subject line for the email.
+	Subject := "Login request from " + realm
+
+	// The HTML body for the email. "<h1>Amazon SES Test Email (AWS SDK for Go)</h1>"+
+	HtmlBody := "<p>Login with this link: " + "<a href='" + link + "'>MAGIC LINK</a></p><br/><br/><p>" + link + "</p>"
 
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String("us-east-1")},
